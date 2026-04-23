@@ -25,7 +25,7 @@ jobs:
       - name: Prepare site
         run: |
           mkdir -p _site
-          cp index.html styles.css app.js drawio-export.js _site/
+          cp index.html styles.css app.js drawio-export.js export-raster.js _site/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

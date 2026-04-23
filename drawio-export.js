@@ -1,7 +1,7 @@
 /**
  * Build diagrams.net (draw.io) XML from nodes + edges.
  * Nodes: { uid, label, x, y, w, h, fillColor, strokeColor, fontColor, rounded, imageUrl? }
- * Edges: { from, to } (node uids)
+ * Edges: { from, to, style? } style: straight | orthogonal | curved
  */
 function escapeXml(s) {
   return String(s || "")
@@ -69,8 +69,17 @@ function exportDrawioXml(diagramName, nodes, edges) {
     var tid = uidToMx[e.to];
     if (!sid || !tid) return;
     var eid = String(cellId++);
-    var style =
-      "edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#8b98a5;fontSize=10;";
+    var st = e.style || "straight";
+    var style;
+    if (st === "orthogonal") {
+      style =
+        "edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;strokeColor=#8b98a5;fontSize=10;";
+    } else if (st === "curved") {
+      style =
+        "curved=1;html=1;endArrow=classic;strokeColor=#8b98a5;fontSize=10;exitX=0.5;exitY=1;entryX=0.5;entryY=0;";
+    } else {
+      style = "endArrow=classic;html=1;rounded=0;strokeColor=#8b98a5;fontSize=10;";
+    }
     cells.push(
       '<mxCell id="' +
         eid +

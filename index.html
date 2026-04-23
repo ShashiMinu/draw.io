@@ -19,6 +19,8 @@
       <div class="toolbar">
         <button type="button" class="btn" id="btn-new" title="Clear canvas">New diagram</button>
         <button type="button" class="btn btn-primary" id="btn-export-drawio">Export .drawio</button>
+        <button type="button" class="btn" id="btn-export-jpg" title="Raster snapshot of the canvas">Export JPG</button>
+        <button type="button" class="btn" id="btn-export-pdf" title="One-page PDF with diagram image">Export PDF</button>
         <button type="button" class="btn" id="btn-export-json">Export JSON</button>
         <label class="btn btn-ghost file-btn">
           Import JSON
@@ -37,6 +39,14 @@
       <main class="canvas-wrap">
         <div class="canvas-toolbar">
           <span id="mode-label" class="mode-label">Click palette to add nodes · Shift+click to link</span>
+          <label class="toolbar-field">
+            <span class="toolbar-field-label">New connectors</span>
+            <select id="connector-style" class="toolbar-select" title="Style for newly created links">
+              <option value="straight">Straight</option>
+              <option value="orthogonal">Orthogonal</option>
+              <option value="curved">Curved</option>
+            </select>
+          </label>
           <button type="button" class="btn btn-small" id="btn-undo" disabled>Undo</button>
         </div>
         <div class="canvas" id="canvas" tabindex="0">
@@ -57,6 +67,28 @@
         </div>
         <p class="hint subtle" id="prompt-status" role="status"></p>
 
+        <h3 class="subh">AI layout (Gemini)</h3>
+        <p class="hint">
+          Optional: describe the architecture in natural language. Uses Google Gemini from your browser. Create a key in Google AI Studio and restrict it by HTTP referrer to your GitHub Pages domain. Key is kept in <strong>session storage</strong> only for this tab.
+        </p>
+        <label class="field-block">
+          <span class="field-block-label">Gemini API key</span>
+          <input type="password" id="gemini-api-key" class="field-input" autocomplete="off" placeholder="Paste API key" />
+        </label>
+        <label class="field-block">
+          <span class="field-block-label">Model</span>
+          <select id="gemini-model" class="field-input">
+            <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+            <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite</option>
+            <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+          </select>
+        </label>
+        <textarea id="ai-prompt" rows="6" class="ai-prompt" placeholder="Example: Internet, IGW, public subnet with load balancer and two compute instances, private subnet with NAT and Autonomous DB, plus monitoring. Add a large rectangle labeled Production VCN grouping."></textarea>
+        <div class="prompt-actions">
+          <label class="check"><input type="checkbox" id="ai-clear" checked /> Clear canvas before AI</label>
+          <button type="button" class="btn btn-primary" id="btn-ai-layout">Run AI layout</button>
+        </div>
+
         <h3 class="subh">Legend (colors)</h3>
         <ul class="legend">
           <li><span class="swatch swatch-net"></span> Networking</li>
@@ -68,7 +100,10 @@
       </aside>
     </div>
   </div>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" crossorigin="anonymous"></script>
   <script src="drawio-export.js"></script>
+  <script src="export-raster.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

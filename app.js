@@ -415,6 +415,44 @@
   var selectedUid = null;
   var dragState = null;
 
+  function isShapeNode(n) {
+    return n && n.kind === "shape";
+  }
+
+  function edgeDrawStyle(e) {
+    return e.style || "straight";
+  }
+
+  function newEdgeStyle() {
+    var sel = $("connector-style");
+    return (sel && sel.value) || "straight";
+  }
+
+  function normalizeImportedEdges() {
+    edges.forEach(function (e) {
+      if (!e.style) e.style = "straight";
+    });
+  }
+
+  function normalizeImportedNodes() {
+    nodes.forEach(function (n) {
+      if (!n.kind) n.kind = isShapeNode(n) ? "shape" : "oci";
+    });
+  }
+
+  function edgePathD(ax, ay, bx, by, style) {
+    if (style === "orthogonal") {
+      var mx = (ax + bx) / 2;
+      return "M " + ax + " " + ay + " L " + mx + " " + ay + " L " + mx + " " + by + " L " + bx + " " + by;
+    }
+    if (style === "curved") {
+      var cx = (ax + bx) / 2;
+      var cy = (ay + by) / 2 - Math.min(120, Math.abs(bx - ax) * 0.25);
+      return "M " + ax + " " + ay + " Q " + cx + " " + cy + " " + bx + " " + by;
+    }
+    return "M " + ax + " " + ay + " L " + bx + " " + by;
+  }
+
   function $(id) {
     return document.getElementById(id);
   }
@@ -433,6 +471,8 @@
     edges = o.edges;
     nextUid = o.nextUid || nextUid;
     selectedUid = null;
+    normalizeImportedNodes();
+    normalizeImportedEdges();
     renderAll();
   }
 
@@ -469,19 +509,46 @@
     var h = Math.max($("nodes-layer").scrollHeight, 900);
     svg.setAttribute("width", w);
     svg.setAttribute("height", h);
-    edges.forEach(function (e) {
+    edges.forEach(function (e, idx) {
       var a = nodeCenter(e.from);
       var b = nodeCenter(e.to);
       if (!a || !b) return;
-      var line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-      line.setAttribute("x1", a.x);
-      line.setAttribute("y1", a.y);
-      line.setAttribute("x2", b.x);
-      line.setAttribute("y2", b.y);
-      line.setAttribute("stroke", "rgba(139,152,165,0.85)");
-      line.setAttribute("stroke-width", "2");
-      svg.appendChild(line);
+      var st = edgeDrawStyle(e);
+      var d = edgePathD(a.x, a.y, b.x, b.y, st);
+      var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", d);
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", "rgba(139,152,165,0.9)");
+      path.setAttribute("stroke-width", "2");
+      path.setAttribute("stroke-linejoin", "round");
+      path.setAttribute("stroke-linecap", "round");
+      path.dataset.edgeIndex = String(idx);
+      path.style.pointerEvents = "none";
+      svg.appendChild(path);
+      var hit = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      hit.setAttribute("d", d);
+      hit.setAttribute("fill", "none");
+      hit.setAttribute("stroke", "transparent");
+      hit.setAttribute("stroke-width", "14");
+      hit.style.cursor = "pointer";
+      hit.dataset.edgeIndex = String(idx);
+      hit.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        cycleEdgeStyle(idx);
+      });
+      svg.appendChild(hit);
     });
+  }
+
+  function cycleEdgeStyle(idx) {
+    var e = edges[idx];
+    if (!e) return;
+    pushHistory();
+    var order = ["straight", "orthogonal", "curved"];
+    var i = order.indexOf(edgeDrawStyle(e));
+    e.style = order[(i + 1) % order.length];
+    renderAll();
+    $("mode-label").textContent = "Connector style: " + e.style + " (click line to cycle)";
   }
 
   function renderNodes() {
@@ -489,26 +556,39 @@
     if (!layer) return;
     layer.innerHTML = "";
     nodes.forEach(function (n) {
-      var ld = layoutDef(n.typeKey);
       var el = document.createElement("div");
-      el.className = "node node--icon cat-" + ld.cat;
       el.dataset.uid = n.uid;
       el.style.left = n.x + "px";
       el.style.top = n.y + "px";
-      el.style.width = NODE_BOX_W + "px";
-      el.style.minHeight = NODE_BOX_H + "px";
-      var img = document.createElement("img");
-      img.className = "node-icon";
-      img.src = ld.iconUrl;
-      img.alt = "";
-      img.loading = "lazy";
-      img.referrerPolicy = "no-referrer";
-      img.draggable = false;
-      var cap = document.createElement("div");
-      cap.className = "node-label";
-      cap.textContent = n.customLabel || ld.label;
-      el.appendChild(img);
-      el.appendChild(cap);
+      if (isShapeNode(n)) {
+        el.className = "node node--shape shape-" + (n.shapeType || "rect");
+        el.style.width = (n.shapeW || 200) + "px";
+        el.style.minHeight = (n.shapeH || 100) + "px";
+        el.style.background = n.shapeFill || "rgba(255,255,255,0.06)";
+        el.style.borderColor = n.shapeStroke || "#64748b";
+        el.style.borderRadius = (n.shapeRadius != null ? n.shapeRadius : 8) + "px";
+        var cap = document.createElement("div");
+        cap.className = "node-label shape-label";
+        cap.textContent = n.customLabel || (n.shapeType === "note" ? "Note" : "Box");
+        el.appendChild(cap);
+      } else {
+        var ld = layoutDef(n.typeKey);
+        el.className = "node node--icon cat-" + ld.cat;
+        el.style.width = NODE_BOX_W + "px";
+        el.style.minHeight = NODE_BOX_H + "px";
+        var img = document.createElement("img");
+        img.className = "node-icon";
+        img.src = ld.iconUrl;
+        img.alt = "";
+        img.loading = "lazy";
+        img.referrerPolicy = "no-referrer";
+        img.draggable = false;
+        var cap2 = document.createElement("div");
+        cap2.className = "node-label";
+        cap2.textContent = n.customLabel || ld.label;
+        el.appendChild(img);
+        el.appendChild(cap2);
+      }
       if (n.uid === selectedUid) el.classList.add("selected");
       el.addEventListener("mousedown", onNodeMouseDown);
       el.addEventListener("click", onNodeClick);
@@ -571,7 +651,7 @@
       var exists = edges.some(function (x) {
         return x.from === selectedUid && x.to === uid;
       });
-      if (!exists) edges.push({ from: selectedUid, to: uid });
+      if (!exists) edges.push({ from: selectedUid, to: uid, style: newEdgeStyle() });
       selectedUid = uid;
       renderAll();
       $("mode-label").textContent = "Linked " + selectedUid;
@@ -588,8 +668,10 @@
       return x.uid === uid;
     });
     if (!n) return;
-    var ld = layoutDef(n.typeKey);
-    var label = window.prompt("Label", n.customLabel || ld.label);
+    var defLabel = isShapeNode(n)
+      ? n.customLabel || (n.shapeType === "note" ? "Note" : "Box")
+      : (n.customLabel || layoutDef(n.typeKey).label);
+    var label = window.prompt("Label", defLabel);
     if (label != null && label.trim()) {
       pushHistory();
       n.customLabel = label.trim();
@@ -602,7 +684,63 @@
     pushHistory();
     var def = TYPE_DEF[typeKey];
     if (!def) typeKey = "compute";
-    nodes.push({ uid: uid(), typeKey: typeKey, x: x || 80 + (nodes.length % 5) * 200, y: y || 80 + Math.floor(nodes.length / 5) * 100 });
+    nodes.push({
+      uid: uid(),
+      kind: "oci",
+      typeKey: typeKey,
+      x: x || 80 + (nodes.length % 5) * 200,
+      y: y || 80 + Math.floor(nodes.length / 5) * 100,
+    });
+    renderAll();
+  }
+
+  function shapePreset(shapeType) {
+    var presets = {
+      rect: {
+        w: 220,
+        h: 130,
+        fill: "rgba(148,163,184,0.12)",
+        stroke: "#94a3b8",
+        r: 4,
+        label: "Rectangle",
+      },
+      roundrect: {
+        w: 220,
+        h: 120,
+        fill: "rgba(30,58,79,0.55)",
+        stroke: "#60a5fa",
+        r: 16,
+        label: "Rounded box",
+      },
+      note: {
+        w: 200,
+        h: 110,
+        fill: "rgba(250,204,21,0.18)",
+        stroke: "#facc15",
+        r: 6,
+        label: "Note",
+      },
+    };
+    return presets[shapeType] || presets.rect;
+  }
+
+  function addShape(shapeType, x, y) {
+    pushHistory();
+    var st = shapeType || "rect";
+    var p = shapePreset(st);
+    nodes.push({
+      uid: uid(),
+      kind: "shape",
+      shapeType: st,
+      x: x || 100 + (nodes.length % 4) * 240,
+      y: y || 120 + Math.floor(nodes.length / 4) * 140,
+      shapeW: p.w,
+      shapeH: p.h,
+      shapeFill: p.fill,
+      shapeStroke: p.stroke,
+      shapeRadius: p.r,
+      customLabel: p.label,
+    });
     renderAll();
   }
 
@@ -610,6 +748,25 @@
     var host = $("palette-groups");
     if (!host) return;
     host.innerHTML = "";
+    var shapesWrap = document.createElement("div");
+    shapesWrap.className = "palette-group";
+    shapesWrap.innerHTML = "<h3>Boxes &amp; notes</h3>";
+    [
+      { st: "rect", label: "Rectangle" },
+      { st: "roundrect", label: "Rounded box" },
+      { st: "note", label: "Sticky note" },
+    ].forEach(function (item) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "pal-item pal-item-shape";
+      b.textContent = item.label;
+      b.addEventListener("click", function () {
+        addShape(item.st);
+      });
+      shapesWrap.appendChild(b);
+    });
+    host.appendChild(shapesWrap);
+
     PALETTE_GROUPS.forEach(function (g) {
       var wrap = document.createElement("div");
       wrap.className = "palette-group";
@@ -702,7 +859,7 @@
       var x = baseX + col * 200;
       var y = baseY + row * 95;
       var u = uid();
-      nodes.push({ uid: u, typeKey: k, x: x, y: y });
+      nodes.push({ uid: u, kind: "oci", typeKey: k, x: x, y: y });
       added.push(u);
       col++;
       if (col > 4) {
@@ -710,15 +867,175 @@
         row++;
       }
     });
+    var es = newEdgeStyle();
     for (var j = 1; j < added.length; j++) {
-      edges.push({ from: added[j - 1], to: added[j] });
+      edges.push({ from: added[j - 1], to: added[j], style: es });
     }
     $("prompt-status").textContent = "Placed " + keys.length + " components and chained edges in prompt order.";
     renderAll();
   }
 
+  function stripJsonFence(t) {
+    var s = String(t || "").trim();
+    if (s.indexOf("```") === 0) {
+      s = s.replace(/^```[a-zA-Z0-9]*\s*/, "").replace(/\s*```\s*$/, "");
+    }
+    return s.trim();
+  }
+
+  function applyAiDiagram(spec) {
+    if (!spec || !Array.isArray(spec.nodes)) throw new Error("Invalid JSON: missing nodes array");
+    if ($("ai-clear") && $("ai-clear").checked) {
+      history.length = 0;
+      nodes = [];
+      edges = [];
+      nextUid = 1;
+      selectedUid = null;
+    }
+    pushHistory();
+    var ids = [];
+    spec.nodes.forEach(function (raw, i) {
+      var u = uid();
+      ids[i] = u;
+      var x = typeof raw.x === "number" ? raw.x : 60 + (i % 4) * 220;
+      var y = typeof raw.y === "number" ? raw.y : 60 + Math.floor(i / 4) * 130;
+      var kind = raw.kind || raw.type || "oci";
+      if (kind === "shape") {
+        var st = raw.shapeType || "rect";
+        if (["rect", "roundrect", "note"].indexOf(st) === -1) st = "rect";
+        var p = shapePreset(st);
+        nodes.push({
+          uid: u,
+          kind: "shape",
+          shapeType: st,
+          x: x,
+          y: y,
+          shapeW: typeof raw.w === "number" ? raw.w : p.w,
+          shapeH: typeof raw.h === "number" ? raw.h : p.h,
+          shapeFill: p.fill,
+          shapeStroke: p.stroke,
+          shapeRadius: p.r,
+          customLabel: raw.label != null && String(raw.label).trim() ? String(raw.label).trim() : p.label,
+        });
+      } else {
+        var tk = raw.typeKey || raw.service || "compute";
+        if (!TYPE_DEF[tk]) tk = "compute";
+        nodes.push({
+          uid: u,
+          kind: "oci",
+          typeKey: tk,
+          x: x,
+          y: y,
+          customLabel: raw.label != null && String(raw.label).trim() ? String(raw.label).trim() : "",
+        });
+      }
+    });
+    (spec.edges || []).forEach(function (e) {
+      var a = ids[e.from];
+      var b = ids[e.to];
+      if (!a || !b) return;
+      var st = e.style && ["straight", "orthogonal", "curved"].indexOf(e.style) >= 0 ? e.style : "straight";
+      edges.push({ from: a, to: b, style: st });
+    });
+    selectedUid = null;
+    normalizeImportedEdges();
+    renderAll();
+  }
+
+  function runAiLayout() {
+    var keyEl = $("gemini-api-key");
+    var key = (keyEl && keyEl.value.trim()) || sessionStorage.getItem("oci_sketch_gemini_key");
+    if (!key) {
+      $("prompt-status").textContent = "Paste a Gemini API key to use AI (stored in session storage for this tab).";
+      return;
+    }
+    sessionStorage.setItem("oci_sketch_gemini_key", key);
+    if (keyEl && !keyEl.value) keyEl.value = key;
+    var userPrompt = ($("ai-prompt") && $("ai-prompt").value.trim()) || "";
+    if (!userPrompt) {
+      $("prompt-status").textContent = "Describe the diagram you want in the AI box.";
+      return;
+    }
+    var model = ($("gemini-model") && $("gemini-model").value) || "gemini-2.0-flash";
+    var ociKeys = Object.keys(TYPE_DEF).join(", ");
+    var instruction =
+      "You are an Oracle Cloud Infrastructure diagram assistant. Return ONLY JSON (no markdown fences). Schema:\n" +
+      '{"clear":boolean,"nodes":[' +
+      '{"kind":"oci","typeKey":"<one of: ' +
+      ociKeys +
+      '>","x":number,"y":number,"label":string},' +
+      '{"kind":"shape","shapeType":"rect|roundrect|note","x":number,"y":number,"w":number,"h":number,"label":string}' +
+      '], "edges":[{"from":number,"to":number,"style":"straight|orthogonal|curved"}]}\n' +
+      "from/to are zero-based indexes into nodes. Use coordinates roughly 40–900. Include useful links.\n" +
+      "User request:\n" +
+      userPrompt;
+
+    $("prompt-status").textContent = "Calling Gemini…";
+
+    fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/" +
+        encodeURIComponent(model) +
+        ":generateContent?key=" +
+        encodeURIComponent(key),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: instruction }] }],
+          generationConfig: {
+            temperature: 0.35,
+            responseMimeType: "application/json",
+          },
+        }),
+      }
+    )
+      .then(function (r) {
+        return r.json().then(function (j) {
+          if (!r.ok) {
+            throw new Error((j && j.error && j.error.message) || "Gemini request failed");
+          }
+          return j;
+        });
+      })
+      .then(function (data) {
+        if (!data.candidates || !data.candidates[0]) {
+          throw new Error("No candidates returned (quota, safety filter, or empty response).");
+        }
+        var p0 = data.candidates[0].content.parts[0];
+        var parsed;
+        if (p0 && p0.text != null) {
+          parsed = JSON.parse(stripJsonFence(p0.text));
+        } else if (p0 && typeof p0 === "object") {
+          parsed = p0;
+        } else {
+          throw new Error("Unexpected Gemini response shape");
+        }
+        applyAiDiagram(parsed);
+        $("prompt-status").textContent = "AI layout applied (" + (parsed.nodes && parsed.nodes.length) + " nodes).";
+      })
+      .catch(function (err) {
+        $("prompt-status").textContent = "AI error: " + (err && err.message ? err.message : String(err));
+      });
+  }
+
   function exportNodesForDrawio() {
     return nodes.map(function (n) {
+      if (isShapeNode(n)) {
+        return {
+          uid: n.uid,
+          label:
+            n.customLabel ||
+            (n.shapeType === "note" ? "Note" : n.shapeType === "roundrect" ? "Rounded box" : "Box"),
+          x: n.x,
+          y: n.y,
+          w: n.shapeW || 200,
+          h: n.shapeH || 100,
+          rounded: n.shapeType === "roundrect" ? 1 : 0,
+          fillColor: n.shapeFill || "#334155",
+          strokeColor: n.shapeStroke || "#94a3b8",
+          fontColor: "#e8ecf0",
+        };
+      }
       var ld = layoutDef(n.typeKey);
       var def = TYPE_DEF[n.typeKey] || TYPE_DEF.compute;
       return {
@@ -751,6 +1068,26 @@
       var xml = exportDrawioXml("OCI architecture", exportNodesForDrawio(), edges);
       downloadText("oci-architecture.drawio", xml, "application/xml;charset=utf-8");
     });
+    $("btn-export-jpg").addEventListener("click", function () {
+      $("mode-label").textContent = "Rendering JPG…";
+      exportCanvasToJpeg($("canvas"), "oci-diagram.jpg", 0.92)
+        .then(function () {
+          $("mode-label").textContent = "JPG downloaded.";
+        })
+        .catch(function () {
+          $("mode-label").textContent = "JPG export failed (see console).";
+        });
+    });
+    $("btn-export-pdf").addEventListener("click", function () {
+      $("mode-label").textContent = "Rendering PDF…";
+      exportCanvasToPdf($("canvas"), "oci-diagram.pdf")
+        .then(function () {
+          $("mode-label").textContent = "PDF downloaded.";
+        })
+        .catch(function () {
+          $("mode-label").textContent = "PDF export failed (see console).";
+        });
+    });
     $("btn-export-json").addEventListener("click", function () {
       downloadText(
         "oci-architecture.json",
@@ -770,6 +1107,8 @@
           edges = o.edges || [];
           nextUid = o.nextUid || 1;
           selectedUid = null;
+          normalizeImportedNodes();
+          normalizeImportedEdges();
           renderAll();
         } catch (err) {
           window.alert("Invalid JSON");
@@ -780,10 +1119,23 @@
     });
     $("btn-undo").addEventListener("click", undo);
     $("btn-apply-prompt").addEventListener("click", applyPrompt);
+    $("btn-ai-layout").addEventListener("click", function () {
+      try {
+        runAiLayout();
+      } catch (err) {
+        $("prompt-status").textContent = "AI error: " + (err && err.message ? err.message : String(err));
+      }
+    });
+    var gk = $("gemini-api-key");
+    if (gk) {
+      var sk = sessionStorage.getItem("oci_sketch_gemini_key");
+      if (sk) gk.value = sk;
+    }
   }
 
   $("canvas").addEventListener("click", function (e) {
     if (e.target.closest && e.target.closest(".node")) return;
+    if (e.target.dataset && e.target.dataset.edgeIndex != null) return;
     if (e.target.id === "canvas" || e.target.id === "nodes-layer") {
       selectedUid = null;
       renderAll();
