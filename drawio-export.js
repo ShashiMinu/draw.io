@@ -1,6 +1,6 @@
 /**
  * Build diagrams.net (draw.io) XML from nodes + edges.
- * Nodes: { uid, label, x, y, w, h, fillColor, strokeColor, fontColor, rounded }
+ * Nodes: { uid, label, x, y, w, h, fillColor, strokeColor, fontColor, rounded, imageUrl? }
  * Edges: { from, to } (node uids)
  */
 function escapeXml(s) {
@@ -22,17 +22,27 @@ function exportDrawioXml(diagramName, nodes, edges) {
   nodes.forEach(function (n) {
     var mid = String(cellId++);
     uidToMx[n.uid] = mid;
-    var r = n.rounded ? "1" : "0";
-    var style =
-      "rounded=" +
-      r +
-      ";whiteSpace=wrap;html=1;fillColor=" +
-      (n.fillColor || "#1e3a4f") +
-      ";strokeColor=" +
-      (n.strokeColor || "#3b82a6") +
-      ";fontColor=" +
-      (n.fontColor || "#e8ecf0") +
-      ";fontSize=11;";
+    var style;
+    if (n.imageUrl) {
+      style =
+        "shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#141b23;html=1;verticalAlign=top;aspect=fixed;imageAspect=0;image=" +
+        escapeXml(n.imageUrl) +
+        ";fontColor=" +
+        escapeXml(n.fontColor || "#e8ecf0") +
+        ";fontSize=11;fontStyle=1;spacing=4;";
+    } else {
+      var r = n.rounded ? "1" : "0";
+      style =
+        "rounded=" +
+        r +
+        ";whiteSpace=wrap;html=1;fillColor=" +
+        (n.fillColor || "#1e3a4f") +
+        ";strokeColor=" +
+        (n.strokeColor || "#3b82a6") +
+        ";fontColor=" +
+        (n.fontColor || "#e8ecf0") +
+        ";fontSize=11;";
+    }
     cells.push(
       '<mxCell id="' +
         mid +

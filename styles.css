@@ -94,6 +94,15 @@ kbd {
   color: var(--muted);
 }
 
+.tag a {
+  color: #7dd3fc;
+  text-decoration: none;
+}
+
+.tag a:hover {
+  text-decoration: underline;
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -212,17 +221,31 @@ kbd {
 }
 
 .pal-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
   width: 100%;
   text-align: left;
   font-size: 0.78rem;
-  padding: 0.35rem 0.45rem;
+  padding: 0.3rem 0.4rem;
   margin-bottom: 0.25rem;
   border-radius: 6px;
   border: 1px solid transparent;
   background: rgba(255, 255, 255, 0.03);
   color: var(--text);
   cursor: pointer;
+}
+
+.pal-thumb {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.pal-text {
+  flex: 1;
+  line-height: 1.2;
 }
 
 .pal-item:hover {
@@ -307,6 +330,32 @@ kbd {
   cursor: grab;
   user-select: none;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+
+.node--icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0.4rem 0.35rem 0.35rem;
+  gap: 0.25rem;
+}
+
+.node--icon .node-icon {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.node--icon .node-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.2;
+  max-width: 100%;
+  word-break: break-word;
+  color: var(--text);
 }
 
 .node:active {

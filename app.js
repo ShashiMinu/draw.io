@@ -283,6 +283,64 @@
     },
   };
 
+  /** OCI SVGs from Oracle oci-designer-toolkit palette (UPL-2.0): https://github.com/oracle/oci-designer-toolkit */
+  var OCI_ICON_BASE =
+    "https://raw.githubusercontent.com/oracle/oci-designer-toolkit/master/okitclassic/okitserver/static/okit/palette/svg/";
+
+  function ociIconFile(file) {
+    return OCI_ICON_BASE + file;
+  }
+
+  var ICON_BY_TYPE = {
+    internet: "CloudService.svg",
+    onprem: "CustomerPremises.svg",
+    fastconnect: "FastConnect.svg",
+    drg: "DynamicRoutingGatewayDRG.svg",
+    vcn: "VirtualCloudNetworkVCN.svg",
+    igw: "InternetGateway.svg",
+    nat: "NATGateway.svg",
+    svcgw: "ServiceGateway.svg",
+    lpg: "LocalPeeringGatewayLPG.svg",
+    subnet: "NetworkSecurityGroup.svg",
+    lb: "LoadBalancerLB.svg",
+    dns: "DomainNameSystemDNS.svg",
+    compute: "VirtualMachine.svg",
+    oke: "ContainerEngineForKubernetes.svg",
+    fn: "Functions.svg",
+    apigw: "APIGateway.svg",
+    bvc: "BlockStorage.svg",
+    os: "ObjectStorage.svg",
+    fs: "FileStorage.svg",
+    dbsystem: "DatabaseSystemDBS.svg",
+    atp: "AutonomousTransactionProcessingATP.svg",
+    exadata: "ExadataDatabaseSystem.svg",
+    iam: "IAM.svg",
+    idcs: "UserGroup.svg",
+    vault: "Vault.svg",
+    waf: "WebApplicationFirewall.svg",
+    cg: "CloudGuard.svg",
+    monitoring: "Monitoring.svg",
+    logging: "Logging.svg",
+    notifications: "Notifications.svg",
+    scan: "Audit.svg",
+  };
+
+  var NODE_BOX_W = 108;
+  var NODE_BOX_H = 96;
+
+  function layoutDef(typeKey) {
+    var d = TYPE_DEF[typeKey] || TYPE_DEF.compute;
+    var file = ICON_BY_TYPE[typeKey] || ICON_BY_TYPE.compute;
+    return {
+      cat: d.cat,
+      label: d.label,
+      fill: d.fill,
+      stroke: d.stroke,
+      rounded: d.rounded,
+      iconUrl: ociIconFile(file),
+    };
+  }
+
   var PHRASES = [];
   function reg(key, list) {
     list.forEach(function (p) {
@@ -431,15 +489,26 @@
     if (!layer) return;
     layer.innerHTML = "";
     nodes.forEach(function (n) {
-      var def = TYPE_DEF[n.typeKey] || TYPE_DEF.compute;
+      var ld = layoutDef(n.typeKey);
       var el = document.createElement("div");
-      el.className = "node cat-" + def.cat;
+      el.className = "node node--icon cat-" + ld.cat;
       el.dataset.uid = n.uid;
-      el.textContent = n.customLabel || def.label;
       el.style.left = n.x + "px";
       el.style.top = n.y + "px";
-      el.style.width = def.w + "px";
-      el.style.minHeight = def.h + "px";
+      el.style.width = NODE_BOX_W + "px";
+      el.style.minHeight = NODE_BOX_H + "px";
+      var img = document.createElement("img");
+      img.className = "node-icon";
+      img.src = ld.iconUrl;
+      img.alt = "";
+      img.loading = "lazy";
+      img.referrerPolicy = "no-referrer";
+      img.draggable = false;
+      var cap = document.createElement("div");
+      cap.className = "node-label";
+      cap.textContent = n.customLabel || ld.label;
+      el.appendChild(img);
+      el.appendChild(cap);
       if (n.uid === selectedUid) el.classList.add("selected");
       el.addEventListener("mousedown", onNodeMouseDown);
       el.addEventListener("click", onNodeClick);
@@ -519,12 +588,13 @@
       return x.uid === uid;
     });
     if (!n) return;
-    var def = TYPE_DEF[n.typeKey];
-    var label = window.prompt("Label", def.label);
+    var ld = layoutDef(n.typeKey);
+    var label = window.prompt("Label", n.customLabel || ld.label);
     if (label != null && label.trim()) {
       pushHistory();
       n.customLabel = label.trim();
-      e.currentTarget.textContent = n.customLabel;
+      var cap = e.currentTarget.querySelector(".node-label");
+      if (cap) cap.textContent = n.customLabel;
     }
   }
 
@@ -547,10 +617,22 @@
       g.keys.forEach(function (key) {
         var def = TYPE_DEF[key];
         if (!def) return;
+        var ld = layoutDef(key);
         var b = document.createElement("button");
         b.type = "button";
         b.className = "pal-item cat-" + def.cat;
-        b.textContent = def.label;
+        var pi = document.createElement("img");
+        pi.className = "pal-thumb";
+        pi.src = ld.iconUrl;
+        pi.alt = "";
+        pi.loading = "lazy";
+        pi.referrerPolicy = "no-referrer";
+        pi.draggable = false;
+        var tx = document.createElement("span");
+        tx.className = "pal-text";
+        tx.textContent = def.label;
+        b.appendChild(pi);
+        b.appendChild(tx);
         b.addEventListener("click", function () {
           addNode(key);
         });
@@ -637,18 +719,20 @@
 
   function exportNodesForDrawio() {
     return nodes.map(function (n) {
+      var ld = layoutDef(n.typeKey);
       var def = TYPE_DEF[n.typeKey] || TYPE_DEF.compute;
       return {
         uid: n.uid,
-        label: n.customLabel || def.label,
+        label: n.customLabel || ld.label,
         x: n.x,
         y: n.y,
-        w: def.w,
-        h: def.h,
+        w: NODE_BOX_W,
+        h: NODE_BOX_H,
         rounded: def.rounded,
         fillColor: def.fill,
         strokeColor: def.stroke,
         fontColor: "#e8ecf0",
+        imageUrl: ld.iconUrl,
       };
     });
   }
@@ -699,6 +783,7 @@
   }
 
   $("canvas").addEventListener("click", function (e) {
+    if (e.target.closest && e.target.closest(".node")) return;
     if (e.target.id === "canvas" || e.target.id === "nodes-layer") {
       selectedUid = null;
       renderAll();
