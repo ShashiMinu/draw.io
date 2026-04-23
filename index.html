@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OCI Architecture Sketch — draw.io export</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div>
+          <h1>OCI Architecture Sketch</h1>
+          <p class="tag">Palette + canvas + prompt → export <code>.drawio</code> for diagrams.net</p>
+        </div>
+      </div>
+      <div class="toolbar">
+        <button type="button" class="btn" id="btn-new" title="Clear canvas">New diagram</button>
+        <button type="button" class="btn btn-primary" id="btn-export-drawio">Export .drawio</button>
+        <button type="button" class="btn" id="btn-export-json">Export JSON</button>
+        <label class="btn btn-ghost file-btn">
+          Import JSON
+          <input type="file" id="import-json" accept="application/json,.json" hidden />
+        </label>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <aside class="palette" aria-label="OCI components">
+        <h2>Components</h2>
+        <p class="hint">Click to add. Drag to move. <kbd>Shift</kbd>+click another node to connect.</p>
+        <div id="palette-groups"></div>
+      </aside>
+
+      <main class="canvas-wrap">
+        <div class="canvas-toolbar">
+          <span id="mode-label" class="mode-label">Click palette to add nodes · Shift+click to link</span>
+          <button type="button" class="btn btn-small" id="btn-undo" disabled>Undo</button>
+        </div>
+        <div class="canvas" id="canvas" tabindex="0">
+          <svg class="edges" id="edges-svg" aria-hidden="true"></svg>
+          <div class="nodes" id="nodes-layer"></div>
+        </div>
+      </main>
+
+      <aside class="prompt-panel">
+        <h2>Prompt layout</h2>
+        <p class="hint">
+          Describe building blocks in plain language. Keywords are matched (VCN, subnet, DRG, IGW, NAT, load balancer, compute, database, OKE, IAM, monitoring, Object Storage, WAF, FastConnect, …).
+        </p>
+        <textarea id="prompt-input" rows="10" placeholder="Example: internet to IGW public subnet with load balancer two compute instances private subnet NAT gateway autonomous database and monitoring"></textarea>
+        <div class="prompt-actions">
+          <label class="check"><input type="checkbox" id="prompt-clear" checked /> Clear canvas first</label>
+          <button type="button" class="btn btn-primary" id="btn-apply-prompt">Apply prompt</button>
+        </div>
+        <p class="hint subtle" id="prompt-status" role="status"></p>
+
+        <h3 class="subh">Legend (colors)</h3>
+        <ul class="legend">
+          <li><span class="swatch swatch-net"></span> Networking</li>
+          <li><span class="swatch swatch-comp"></span> Compute</li>
+          <li><span class="swatch swatch-data"></span> Data</li>
+          <li><span class="swatch swatch-id"></span> Identity &amp; security</li>
+          <li><span class="swatch swatch-obs"></span> Observability</li>
+        </ul>
+      </aside>
+    </div>
+  </div>
+  <script src="drawio-export.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
