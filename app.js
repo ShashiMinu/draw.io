@@ -1018,6 +1018,55 @@
       });
   }
 
+  function iconFilenameToTypeKeyMap() {
+    var m = {};
+    Object.keys(ICON_BY_TYPE).forEach(function (k) {
+      m[String(ICON_BY_TYPE[k]).toLowerCase()] = k;
+    });
+    return m;
+  }
+
+  function applyDrawioImportBundle(bundle) {
+    var idMap = {};
+    (bundle.cells || []).forEach(function (c) {
+      var u = uid();
+      idMap[c.mxId] = u;
+      var p = c.payload;
+      if (p.kind === "oci") {
+        var tk = TYPE_DEF[p.typeKey] ? p.typeKey : "compute";
+        nodes.push({
+          uid: u,
+          kind: "oci",
+          typeKey: tk,
+          x: p.x,
+          y: p.y,
+          customLabel: p.customLabel || "",
+        });
+      } else {
+        nodes.push({
+          uid: u,
+          kind: "shape",
+          shapeType: p.shapeType || "rect",
+          x: p.x,
+          y: p.y,
+          shapeW: p.shapeW,
+          shapeH: p.shapeH,
+          shapeFill: p.shapeFill,
+          shapeStroke: p.shapeStroke,
+          shapeRadius: p.shapeRadius != null ? p.shapeRadius : 8,
+          customLabel: p.customLabel || "",
+        });
+      }
+    });
+    (bundle.edges || []).forEach(function (e) {
+      var a = idMap[e.fromMx];
+      var b = idMap[e.toMx];
+      if (!a || !b) return;
+      var st = e.style && ["straight", "orthogonal", "curved"].indexOf(e.style) >= 0 ? e.style : "straight";
+      edges.push({ from: a, to: b, style: st });
+    });
+  }
+
   function exportNodesForDrawio() {
     return nodes.map(function (n) {
       if (isShapeNode(n)) {
@@ -1117,6 +1166,45 @@
       };
       r.readAsText(f);
     });
+    var drawioInput = $("import-drawio");
+    if (drawioInput) {
+      drawioInput.addEventListener("change", function (ev) {
+        var f = ev.target.files && ev.target.files[0];
+        if (!f) return;
+        var r = new FileReader();
+        r.onload = function () {
+          try {
+            if (typeof parseDrawioForOciSketch !== "function") {
+              window.alert("Draw.io import script did not load. Refresh the page.");
+              ev.target.value = "";
+              return;
+            }
+            var bundle = parseDrawioForOciSketch(r.result, iconFilenameToTypeKeyMap());
+            if (!bundle.cells || bundle.cells.length === 0) {
+              window.alert(bundle.note || "No shapes found in this file.");
+              ev.target.value = "";
+              return;
+            }
+            pushHistory();
+            nodes = [];
+            edges = [];
+            nextUid = 1;
+            selectedUid = null;
+            applyDrawioImportBundle(bundle);
+            normalizeImportedNodes();
+            normalizeImportedEdges();
+            renderAll();
+            var ec = (bundle.edges && bundle.edges.length) || 0;
+            $("mode-label").textContent = "Imported " + bundle.cells.length + " nodes, " + ec + " connectors from .drawio.";
+            if ($("prompt-status")) $("prompt-status").textContent = bundle.note || "Draw.io import complete.";
+          } catch (err) {
+            window.alert("Draw.io import failed: " + (err && err.message ? err.message : String(err)));
+          }
+          ev.target.value = "";
+        };
+        r.readAsText(f);
+      });
+    }
     $("btn-undo").addEventListener("click", undo);
     $("btn-apply-prompt").addEventListener("click", applyPrompt);
     $("btn-ai-layout").addEventListener("click", function () {

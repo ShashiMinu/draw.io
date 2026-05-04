@@ -13,7 +13,7 @@
         <span class="brand-mark" aria-hidden="true"></span>
         <div>
           <h1>OCI Architecture Sketch</h1>
-          <p class="tag">OCI palette SVGs from <a href="https://github.com/oracle/oci-designer-toolkit" rel="noopener noreferrer">oracle/oci-designer-toolkit</a> (UPL-2.0). Export <code>.drawio</code> for <a href="https://app.diagrams.net/" rel="noopener noreferrer">diagrams.net</a>.</p>
+          <p class="tag">OCI palette SVGs from <a href="https://github.com/oracle/oci-designer-toolkit" rel="noopener noreferrer">oracle/oci-designer-toolkit</a> (UPL-2.0). Import or export <code>.drawio</code> for <a href="https://app.diagrams.net/" rel="noopener noreferrer">diagrams.net</a>.</p>
         </div>
       </div>
       <div class="toolbar">
@@ -25,6 +25,10 @@
         <label class="btn btn-ghost file-btn">
           Import JSON
           <input type="file" id="import-json" accept="application/json,.json" hidden />
+        </label>
+        <label class="btn btn-ghost file-btn" title="Open a diagrams.net file (.drawio / .xml). OCI icons round-trip; other shapes become boxes.">
+          Import .drawio
+          <input type="file" id="import-drawio" accept=".drawio,application/xml,text/xml,.xml" hidden />
         </label>
       </div>
     </header>
@@ -102,7 +106,9 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js" crossorigin="anonymous"></script>
   <script src="drawio-export.js"></script>
+  <script src="drawio-import.js"></script>
   <script src="export-raster.js"></script>
   <script src="app.js"></script>
 </body>
