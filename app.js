@@ -436,7 +436,11 @@
 
   function normalizeImportedNodes() {
     nodes.forEach(function (n) {
-      if (!n.kind) n.kind = isShapeNode(n) ? "shape" : "oci";
+      if (!n.kind) {
+        if (n.dataUrl) n.kind = "raster";
+        else if (n.shapeType != null && n.shapeType !== "") n.kind = "shape";
+        else n.kind = "oci";
+      }
     });
   }
 
@@ -571,6 +575,22 @@
         cap.className = "node-label shape-label";
         cap.textContent = n.customLabel || (n.shapeType === "note" ? "Note" : "Box");
         el.appendChild(cap);
+      } else if (n.kind === "raster") {
+        el.className = "node node--raster";
+        el.style.width = (n.rasterW || 240) + "px";
+        el.style.minHeight = (n.rasterH || 180) + "px";
+        var rImg = document.createElement("img");
+        rImg.className = "node-raster-img";
+        rImg.alt = "";
+        rImg.draggable = false;
+        rImg.loading = "lazy";
+        rImg.style.maxHeight = (n.rasterH || 180) + "px";
+        rImg.src = n.dataUrl || "";
+        var rcap = document.createElement("div");
+        rcap.className = "node-label";
+        rcap.textContent = n.customLabel || "Image";
+        el.appendChild(rImg);
+        el.appendChild(rcap);
       } else {
         var ld = layoutDef(n.typeKey);
         el.className = "node node--icon cat-" + ld.cat;
@@ -668,9 +688,14 @@
       return x.uid === uid;
     });
     if (!n) return;
-    var defLabel = isShapeNode(n)
-      ? n.customLabel || (n.shapeType === "note" ? "Note" : "Box")
-      : (n.customLabel || layoutDef(n.typeKey).label);
+    var defLabel;
+    if (isShapeNode(n)) {
+      defLabel = n.customLabel || (n.shapeType === "note" ? "Note" : "Box");
+    } else if (n.kind === "raster") {
+      defLabel = n.customLabel || "Image";
+    } else {
+      defLabel = n.customLabel || layoutDef(n.typeKey).label;
+    }
     var label = window.prompt("Label", defLabel);
     if (label != null && label.trim()) {
       pushHistory();
@@ -1026,6 +1051,82 @@
     return m;
   }
 
+  var PDFJS_WORKER =
+    "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+  var RASTER_MAX_DIM = 480;
+
+  function scaleRasterDims(nw, nh) {
+    var w = Number(nw) || 240;
+    var h = Number(nh) || 180;
+    if (w <= 0 || h <= 0) return { w: 240, h: 180 };
+    if (w > RASTER_MAX_DIM || h > RASTER_MAX_DIM) {
+      var r = Math.min(RASTER_MAX_DIM / w, RASTER_MAX_DIM / h);
+      return { w: Math.round(w * r), h: Math.round(h * r) };
+    }
+    return { w: Math.round(w), h: Math.round(h) };
+  }
+
+  function pdfFirstPageToDataUrl(arrayBuffer) {
+    return new Promise(function (resolve, reject) {
+      if (typeof pdfjsLib === "undefined") {
+        reject(new Error("PDF library not loaded; refresh the page."));
+        return;
+      }
+      pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+      pdfjsLib
+        .getDocument({ data: new Uint8Array(arrayBuffer) })
+        .promise.then(function (pdf) {
+          return pdf.getPage(1);
+        })
+        .then(function (page) {
+          var vp = page.getViewport({ scale: 2 });
+          var canvas = document.createElement("canvas");
+          canvas.width = vp.width;
+          canvas.height = vp.height;
+          var ctx = canvas.getContext("2d");
+          return page.render({ canvasContext: ctx, viewport: vp }).promise.then(function () {
+            return {
+              dataUrl: canvas.toDataURL("image/png", 0.92),
+              w: canvas.width,
+              h: canvas.height,
+            };
+          });
+        })
+        .then(resolve)
+        .catch(reject);
+    });
+  }
+
+  function fileStem(name) {
+    var base = (name || "").split(/[/\\]/).pop() || "Imported";
+    var s = base.replace(/\.[^.]+$/, "");
+    return s || "Imported";
+  }
+
+  function importFileKind(file) {
+    var name = (file.name || "").toLowerCase();
+    var t = file.type || "";
+    if (t === "application/pdf" || name.endsWith(".pdf")) return "pdf";
+    if (t.indexOf("image/") === 0) return "image";
+    if (/\.(jpe?g|png|gif|webp)$/i.test(name)) return "image";
+    return "drawio";
+  }
+
+  function appendRasterNode(dataUrl, naturalW, naturalH, label) {
+    var dim = scaleRasterDims(naturalW, naturalH);
+    var idx = nodes.length;
+    nodes.push({
+      uid: uid(),
+      kind: "raster",
+      dataUrl: dataUrl,
+      rasterW: dim.w,
+      rasterH: dim.h,
+      x: 48 + (idx % 8) * 24,
+      y: 48 + (idx % 8) * 20,
+      customLabel: label || "",
+    });
+  }
+
   function applyDrawioImportBundle(bundle) {
     var idMap = {};
     (bundle.cells || []).forEach(function (c) {
@@ -1040,6 +1141,17 @@
           typeKey: tk,
           x: p.x,
           y: p.y,
+          customLabel: p.customLabel || "",
+        });
+      } else if (p.kind === "raster") {
+        nodes.push({
+          uid: u,
+          kind: "raster",
+          x: p.x,
+          y: p.y,
+          rasterW: Math.max(32, Math.round(p.rasterW || 120)),
+          rasterH: Math.max(24, Math.round(p.rasterH || 90)),
+          dataUrl: p.dataUrl,
           customLabel: p.customLabel || "",
         });
       } else {
@@ -1083,6 +1195,21 @@
           fillColor: n.shapeFill || "#334155",
           strokeColor: n.shapeStroke || "#94a3b8",
           fontColor: "#e8ecf0",
+        };
+      }
+      if (n.kind === "raster") {
+        return {
+          uid: n.uid,
+          label: n.customLabel || "Image",
+          x: n.x,
+          y: n.y,
+          w: n.rasterW || 240,
+          h: n.rasterH || 180,
+          rounded: 0,
+          fillColor: "#141b23",
+          strokeColor: "#64748b",
+          fontColor: "#e8ecf0",
+          imageUrl: n.dataUrl,
         };
       }
       var ld = layoutDef(n.typeKey);
@@ -1166,27 +1293,100 @@
       };
       r.readAsText(f);
     });
-    var drawioInput = $("import-drawio");
-    if (drawioInput) {
-      drawioInput.addEventListener("change", function (ev) {
+    var diagramInput = $("import-diagram");
+    if (diagramInput) {
+      diagramInput.addEventListener("change", function (ev) {
         var f = ev.target.files && ev.target.files[0];
         if (!f) return;
+        var kind = importFileKind(f);
+        var target = ev.target;
+
+        if (kind === "image") {
+          var ri = new FileReader();
+          ri.onload = function () {
+            var dataUrl = ri.result;
+            if (typeof dataUrl !== "string") {
+              window.alert("Could not read image.");
+              target.value = "";
+              return;
+            }
+            var img = new Image();
+            img.onload = function () {
+              try {
+                pushHistory();
+                appendRasterNode(dataUrl, img.naturalWidth, img.naturalHeight, fileStem(f.name));
+                normalizeImportedNodes();
+                normalizeImportedEdges();
+                renderAll();
+                $("mode-label").textContent =
+                  "Added image (" + img.naturalWidth + "×" + img.naturalHeight + "). Double-click to rename.";
+                if ($("prompt-status")) $("prompt-status").textContent = "";
+              } catch (err) {
+                window.alert("Image import failed: " + (err && err.message ? err.message : String(err)));
+              }
+              target.value = "";
+            };
+            img.onerror = function () {
+              window.alert("Could not decode image file.");
+              target.value = "";
+            };
+            img.src = dataUrl;
+          };
+          ri.onerror = function () {
+            window.alert("Could not read file.");
+            target.value = "";
+          };
+          ri.readAsDataURL(f);
+          return;
+        }
+
+        if (kind === "pdf") {
+          var rp = new FileReader();
+          rp.onload = function () {
+            pdfFirstPageToDataUrl(rp.result)
+              .then(function (out) {
+                try {
+                  pushHistory();
+                  appendRasterNode(out.dataUrl, out.w, out.h, fileStem(f.name) + " (p.1)");
+                  normalizeImportedNodes();
+                  normalizeImportedEdges();
+                  renderAll();
+                  $("mode-label").textContent =
+                    "Added PDF page 1 as image (" + out.w + "×" + out.h + ").";
+                  if ($("prompt-status")) $("prompt-status").textContent = "";
+                } catch (err) {
+                  window.alert("PDF import failed: " + (err && err.message ? err.message : String(err)));
+                }
+                target.value = "";
+              })
+              .catch(function (err) {
+                window.alert("PDF import failed: " + (err && err.message ? err.message : String(err)));
+                target.value = "";
+              });
+          };
+          rp.onerror = function () {
+            window.alert("Could not read PDF file.");
+            target.value = "";
+          };
+          rp.readAsArrayBuffer(f);
+          return;
+        }
+
         var r = new FileReader();
         r.onload = function () {
           try {
             if (typeof parseDrawioForOciSketch !== "function") {
               window.alert("Draw.io import script did not load. Refresh the page.");
-              ev.target.value = "";
+              target.value = "";
               return;
             }
             var bundle = parseDrawioForOciSketch(r.result, iconFilenameToTypeKeyMap());
             if (!bundle.cells || bundle.cells.length === 0) {
               window.alert(bundle.note || "No shapes found in this file.");
-              ev.target.value = "";
+              target.value = "";
               return;
             }
-            var merge =
-              $("drawio-merge-canvas") && $("drawio-merge-canvas").checked;
+            var merge = $("drawio-merge-canvas") && $("drawio-merge-canvas").checked;
             pushHistory();
             if (!merge) {
               nodes = [];
@@ -1206,15 +1406,19 @@
               bundle.cells.length +
               " nodes, " +
               ec +
-              " connectors from .drawio" +
+              " connectors from diagram" +
               (merge ? " (canvas kept)." : ".");
             if ($("prompt-status"))
               $("prompt-status").textContent =
                 bundle.note || (merge ? "Draw.io merge complete." : "Draw.io import complete.");
           } catch (err) {
-            window.alert("Draw.io import failed: " + (err && err.message ? err.message : String(err)));
+            window.alert("Import failed: " + (err && err.message ? err.message : String(err)));
           }
-          ev.target.value = "";
+          target.value = "";
+        };
+        r.onerror = function () {
+          window.alert("Could not read file.");
+          target.value = "";
         };
         r.readAsText(f);
       });

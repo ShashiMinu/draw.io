@@ -13,7 +13,7 @@
         <span class="brand-mark" aria-hidden="true"></span>
         <div>
           <h1>OCI Architecture Sketch</h1>
-          <p class="tag">OCI palette SVGs from <a href="https://github.com/oracle/oci-designer-toolkit" rel="noopener noreferrer">oracle/oci-designer-toolkit</a> (UPL-2.0). Import or export <code>.drawio</code> for <a href="https://app.diagrams.net/" rel="noopener noreferrer">diagrams.net</a>.</p>
+          <p class="tag">OCI palette SVGs from <a href="https://github.com/oracle/oci-designer-toolkit" rel="noopener noreferrer">oracle/oci-designer-toolkit</a> (UPL-2.0). Import <code>.drawio</code>, images, or PDF (first page); export to diagrams.net, JSON, JPG, or PDF.</p>
         </div>
       </div>
       <div class="toolbar">
@@ -27,13 +27,13 @@
           <input type="file" id="import-json" accept="application/json,.json" hidden />
         </label>
         <span class="toolbar-drawio">
-          <label class="check drawio-merge-label" title="Keep everything on the canvas and add shapes from the file.">
+          <label class="check drawio-merge-label" title="When importing .drawio / .xml: keep the canvas and merge. Images and PDF always add on top.">
             <input type="checkbox" id="drawio-merge-canvas" />
             Merge into canvas
           </label>
-          <label class="btn btn-ghost file-btn" title="Open a diagrams.net file (.drawio / .xml). OCI icons round-trip; other shapes become boxes.">
-            Import .drawio
-            <input type="file" id="import-drawio" accept=".drawio,application/xml,text/xml,.xml" hidden />
+          <label class="btn btn-ghost file-btn" title="diagrams.net (.drawio, .xml), JPG / PNG / WebP / GIF, or PDF (first page as image).">
+            Import file
+            <input type="file" id="import-diagram" accept=".drawio,.xml,application/xml,text/xml,image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif,application/pdf,.pdf" hidden />
           </label>
         </span>
       </div>
@@ -113,6 +113,7 @@
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" crossorigin="anonymous"></script>
   <script src="drawio-export.js"></script>
   <script src="drawio-import.js"></script>
   <script src="export-raster.js"></script>

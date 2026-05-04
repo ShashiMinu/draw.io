@@ -127,7 +127,6 @@
     }
     var cells = [];
     var edges = [];
-    var warnings = [];
 
     Array.from(root.querySelectorAll("mxCell")).forEach(function (cell) {
       var mxId = cell.getAttribute("id");
@@ -170,7 +169,21 @@
           });
           return;
         }
-        warnings.push("Unrecognized image shape " + (file || "(no url)") + " — imported as box.");
+        if (imgUrl) {
+          cells.push({
+            mxId: mxId,
+            payload: {
+              kind: "raster",
+              x: x,
+              y: y,
+              rasterW: Math.max(40, Math.round(w)),
+              rasterH: Math.max(32, Math.round(h)),
+              dataUrl: imgUrl,
+              customLabel: label || "",
+            },
+          });
+          return;
+        }
       }
 
       var rounded = st.rounded === "1" || /\brounded=1\b/.test(styleStr);
@@ -199,9 +212,7 @@
       });
     });
 
-    var note = "";
-    if (warnings.length) note = warnings.slice(0, 3).join(" ");
-    return { cells: cells, edges: edges, note: note };
+    return { cells: cells, edges: edges, note: "" };
   }
 
   global.parseDrawioForOciSketch = parseDrawioForOciSketch;
