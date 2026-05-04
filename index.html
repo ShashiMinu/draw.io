@@ -26,10 +26,16 @@
           Import JSON
           <input type="file" id="import-json" accept="application/json,.json" hidden />
         </label>
-        <label class="btn btn-ghost file-btn" title="Open a diagrams.net file (.drawio / .xml). OCI icons round-trip; other shapes become boxes.">
-          Import .drawio
-          <input type="file" id="import-drawio" accept=".drawio,application/xml,text/xml,.xml" hidden />
-        </label>
+        <span class="toolbar-drawio">
+          <label class="check drawio-merge-label" title="Keep everything on the canvas and add shapes from the file.">
+            <input type="checkbox" id="drawio-merge-canvas" />
+            Merge into canvas
+          </label>
+          <label class="btn btn-ghost file-btn" title="Open a diagrams.net file (.drawio / .xml). OCI icons round-trip; other shapes become boxes.">
+            Import .drawio
+            <input type="file" id="import-drawio" accept=".drawio,application/xml,text/xml,.xml" hidden />
+          </label>
+        </span>
       </div>
     </header>
 

@@ -110,6 +110,18 @@ kbd {
   align-items: center;
 }
 
+.toolbar-drawio {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+}
+
+.drawio-merge-label {
+  margin: 0;
+  white-space: nowrap;
+}
+
 .toolbar-field {
   display: flex;
   align-items: center;

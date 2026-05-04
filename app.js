@@ -1185,18 +1185,32 @@
               ev.target.value = "";
               return;
             }
+            var merge =
+              $("drawio-merge-canvas") && $("drawio-merge-canvas").checked;
             pushHistory();
-            nodes = [];
-            edges = [];
-            nextUid = 1;
+            if (!merge) {
+              nodes = [];
+              edges = [];
+              nextUid = 1;
+            }
             selectedUid = null;
             applyDrawioImportBundle(bundle);
             normalizeImportedNodes();
             normalizeImportedEdges();
             renderAll();
             var ec = (bundle.edges && bundle.edges.length) || 0;
-            $("mode-label").textContent = "Imported " + bundle.cells.length + " nodes, " + ec + " connectors from .drawio.";
-            if ($("prompt-status")) $("prompt-status").textContent = bundle.note || "Draw.io import complete.";
+            var verb = merge ? "Merged" : "Imported";
+            $("mode-label").textContent =
+              verb +
+              " " +
+              bundle.cells.length +
+              " nodes, " +
+              ec +
+              " connectors from .drawio" +
+              (merge ? " (canvas kept)." : ".");
+            if ($("prompt-status"))
+              $("prompt-status").textContent =
+                bundle.note || (merge ? "Draw.io merge complete." : "Draw.io import complete.");
           } catch (err) {
             window.alert("Draw.io import failed: " + (err && err.message ? err.message : String(err)));
           }
